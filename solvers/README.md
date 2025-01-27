@@ -16,7 +16,7 @@ As the step size approaches zero, Eulers method approaches the true value as the
 ### Method
 
 $$
-x_{k+1}= x_{k-1} + \Delta t \cdot f(x_k, t_k)
+x_{k+1}= x_{k} + \Delta t \cdot f(x_k, t_k)
 $$
 
 The function, $f$ must be able to be evaluated at time $t_k$
