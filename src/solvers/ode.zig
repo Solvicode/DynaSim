@@ -1,4 +1,4 @@
-const SolverError = error{
+pub const SolverError = error{
     InvalidTimeDelta,
 };
 
@@ -6,21 +6,25 @@ pub const IntegrationMethod = enum {
     euler,
     huen,
 };
-pub fn ODE(comptime N: usize) type {
-    const DerivativeFn = *const fn (x: [N]f64, t: f64) [N]f64;
+
+pub fn ODE(comptime StateDimension: usize, comptime InputDimension: usize) type {
+    const DerivativeFn = *const fn (x: @Vector(StateDimension, f64), u: ?@Vector(InputDimension, f64), t: ?f64) @Vector(StateDimension, f64);
 
     return struct {
-        x: [N]f64,
-        t: f64,
+        x: @Vector(StateDimension, f64),
+        u: ?@Vector(InputDimension, f64),
+        t: ?f64,
         derivative: DerivativeFn,
 
         pub fn init(
-            x: [N]f64,
-            t: f64,
+            x: @Vector(StateDimension, f64),
+            u: ?@Vector(InputDimension, f64),
+            t: ?f64,
             derivative: DerivativeFn,
         ) @This() {
             return .{
                 .x = x,
+                .u = u,
                 .t = t,
                 .derivative = derivative,
             };
@@ -28,29 +32,27 @@ pub fn ODE(comptime N: usize) type {
 
         pub fn step(
             self: @This(),
+            u: ?@Vector(InputDimension, f64),
             dt: f64,
             method: IntegrationMethod,
         ) !@This() {
             if (dt <= 0) return SolverError.InvalidTimeDelta;
 
+            // assign the input
+            self.u = u;
+
             switch (method) {
-                .euler => return Euler(N, self, dt),
-                .huen => return Huen(N, self, dt),
+                .euler => return Euler(StateDimension, self, dt),
+                .huen => return Huen(StateDimension, self, dt),
             }
         }
     };
 }
 
 pub fn Euler(comptime N: usize, ode: ODE(N), dt: f64) !ODE(N) {
-    const dx = ode.derivative(ode.x, ode.t);
-
-    const Vec = @Vector(N, f64);
-    const dx_vec = @as(Vec, dx);
-    const x_vec = @as(Vec, ode.x);
-    const dt_vec: Vec = @splat(dt);
-
-    const x_next_vec = x_vec + dt_vec * dx_vec;
-    const x_next = @as([N]f64, x_next_vec);
+    const dt_vec: @Vector(N, f64) = @splat(dt);
+    const dx = ode.derivative(ode.x, ode.u, ode.t);
+    const x_next = ode.x + dt_vec * dx;
 
     return .{
         .x = x_next,
@@ -64,18 +66,13 @@ pub fn Huen(comptime N: usize, ode: ODE(N), dt: f64) !ODE(N) {
     const dt_vec: Vec = @splat(dt);
     const half_dt_vec: Vec = @splat(dt / 2.0);
 
-    const k1 = ode.derivative(ode.x, ode.t);
-    const k1_vec = @as(Vec, k1);
-    const x_vec = @as(Vec, ode.x);
+    const k1 = ode.derivative(ode.x, ode.u, ode.t);
 
-    const x_intermediate_vec = x_vec + dt_vec * k1_vec;
-    const x_intermediate = @as([N]f64, x_intermediate_vec);
+    const x_intermediate = ode.x + dt_vec * k1;
 
-    const k2 = ode.derivative(x_intermediate, ode.t + dt);
-    const k2_vec = @as(Vec, k2);
+    const k2 = ode.derivative(x_intermediate, ode.u, ode.t + dt);
 
-    const x_next_vec = x_vec + half_dt_vec * (k1_vec + k2_vec);
-    const x_next = @as([N]f64, x_next_vec);
+    const x_next = ode.x + half_dt_vec * (k1 + k2);
 
     return .{
         .x = x_next,
