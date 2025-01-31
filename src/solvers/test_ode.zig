@@ -61,20 +61,24 @@ test "zero time delta gives error" {
 }
 
 test "final value is as expected" {
-    const xinit = @Vector(2, f64){ 0.0, 0.0 };
-    const ustep = @Vector(2, f64){ 0.0, 1.0 };
-
-    const t0 = 0.0;
-    const dt = 0.00001;
-
-    const initial_ode = ode.ODE(2, 2).init(xinit, ustep, t0, secondOrderSystem);
-    var current_ode = initial_ode;
-
     inline for (solvers) |solver| {
-        std.debug.print("Testing solver: {any}\n", .{solver});
-        inline for (0..200) |_| {
+
+        // initial conditions
+        const xinit = @Vector(2, f64){ 0.0, 0.0 };
+        const ustep = @Vector(2, f64){ 0.0, 1.0 };
+        const t0 = 0.0;
+        const dt = 0.001;
+
+        const initial_ode = ode.ODE(2, 2).init(xinit, ustep, t0, secondOrderSystem);
+        var current_ode = initial_ode;
+        var t: f64 = t0;
+
+        var i: usize = 0;
+        while (i < 10000) : (i += 1) {
             current_ode = try current_ode.step(ustep, dt, solver);
-            std.debug.print("x: {any}\n", .{current_ode.x});
+            t += dt;
         }
+        try std.testing.expectApproxEqAbs(1.0, current_ode.x[0], 1e-3);
+        try std.testing.expectApproxEqAbs(0.0, current_ode.x[1], 1e-3);
     }
 }
