@@ -41,7 +41,7 @@ test "static field preserves state" {
         try std.testing.expectEqual(next_ode.x, initial_x);
 
         // test multiple steps to ensure consistency
-        const next_next_ode = try next_ode.step(dt, solver);
+        const next_next_ode = try next_ode.step(null, dt, solver);
         try std.testing.expectEqual(next_next_ode.x, initial_x);
     }
 }
