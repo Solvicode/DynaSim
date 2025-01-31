@@ -25,6 +25,19 @@ fn secondOrderSystem(x: @Vector(2, f64), u: ?@Vector(2, f64), t: ?f64) @Vector(2
     };
 }
 
+fn lorentzAttractor(x: @Vector(3, f64), u: ?@Vector(0, f64), t: ?f64) @Vector(3, f64) {
+    _ = t; // no time dependence
+    _ = u; // no input
+    const sigma: f64 = 10.0;
+    const rho: f64 = 28.0;
+    const beta: f64 = 2.67;
+
+    return .{
+        sigma * (x[1] - x[0]),
+        x[0] * (rho - x[2]) - x[1],
+        x[0] * x[1] - beta * x[2],
+    };
+}
 test "static field preserves state" {
 
     // initial conditions
@@ -36,8 +49,7 @@ test "static field preserves state" {
     var initial_ode = ode.ODE(2, 0).init(xinit, null, dtinit, t0, staticField);
     const initial_x = initial_ode.x;
 
-    inline for (solvers) |solver| {
-        // take a step
+    inline for (solvers) |solver| { // take a step
         const next_ode = try initial_ode.step(null, solver, null, null, null);
 
         // check that original state is unchanged
@@ -95,5 +107,35 @@ test "final value is as expected" {
         }
         try std.testing.expectApproxEqAbs(1.0, current_ode.x[0], 1e-3);
         try std.testing.expectApproxEqAbs(0.0, current_ode.x[1], 1e-3);
+    }
+}
+
+test "lorentz attractor" {
+    const xinit = @Vector(3, f64){ 1.0, 1.0, 1.0 };
+    const dtinit = 0.001;
+    const t0 = 0.0;
+    const initial_ode = ode.ODE(3, 0).init(xinit, null, dtinit, t0, lorentzAttractor);
+
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    const allocator = gpa.allocator();
+    defer _ = gpa.deinit();
+
+    inline for (solvers) |solver| {
+        var current_ode = initial_ode;
+
+        const filename = try std.fmt.allocPrint(allocator, "lorentz_results_{s}.csv", .{@tagName(solver)});
+        defer allocator.free(filename);
+
+        const file = try std.fs.cwd().createFile(filename, .{});
+        defer file.close();
+
+        const writer = file.writer();
+        try writer.writeAll("time,x0,x1\n");
+
+        var i: usize = 0;
+        while (i < 10000) : (i += 1) {
+            try writer.print("{d},{d},{d},{d}\n", .{ current_ode.t, current_ode.x[0], current_ode.x[1], current_ode.x[2] });
+            current_ode = try current_ode.step(null, solver, true, null, null);
+        }
     }
 }

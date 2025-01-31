@@ -186,7 +186,7 @@ pub fn RungeKutta4(
             if (current_dt < timeTol) {
                 return error.ShrunkTimeDelta;
             }
-        } else if (max_error < stateTol / 10.0) {
+        } else if (max_error < stateTol / 5.0) {
             // if error is very small increase the step size
             current_dt = current_dt * 2.0;
         }
