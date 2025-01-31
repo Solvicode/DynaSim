@@ -9,7 +9,11 @@ pub const IntegrationMethod = enum {
 };
 
 pub fn ODE(comptime StateDimension: usize, comptime InputDimension: usize) type {
-    const DerivativeFn = *const fn (x: @Vector(StateDimension, f64), u: ?@Vector(InputDimension, f64), t: ?f64) @Vector(StateDimension, f64);
+    const DerivativeFn = *const fn (
+        x: @Vector(StateDimension, f64),
+        u: ?@Vector(InputDimension, f64),
+        t: ?f64,
+    ) @Vector(StateDimension, f64);
 
     return struct {
         x: @Vector(StateDimension, f64),
@@ -36,6 +40,8 @@ pub fn ODE(comptime StateDimension: usize, comptime InputDimension: usize) type 
             u: ?@Vector(InputDimension, f64),
             dt: f64,
             method: IntegrationMethod,
+            adaptive: ?bool,
+            tolerance: ?f64,
         ) !@This() {
             if (dt <= 0) return SolverError.InvalidTimeDelta;
 
@@ -50,13 +56,25 @@ pub fn ODE(comptime StateDimension: usize, comptime InputDimension: usize) type 
             switch (method) {
                 .euler => return Euler(StateDimension, InputDimension, new_state, dt),
                 .huen => return Huen(StateDimension, InputDimension, new_state, dt),
-                .rk4 => return RungeKutta4(StateDimension, InputDimension, new_state, dt),
+                .rk4 => return RungeKutta4(
+                    StateDimension,
+                    InputDimension,
+                    new_state,
+                    dt,
+                    adaptive,
+                    tolerance,
+                ),
             }
         }
     };
 }
 
-pub fn Euler(comptime StateDimension: usize, comptime InputDimension: usize, ode: ODE(StateDimension, InputDimension), dt: f64) !ODE(StateDimension, InputDimension) {
+pub fn Euler(
+    comptime StateDimension: usize,
+    comptime InputDimension: usize,
+    ode: ODE(StateDimension, InputDimension),
+    dt: f64,
+) !ODE(StateDimension, InputDimension) {
     const dt_vec: @Vector(StateDimension, f64) = @splat(dt);
     const dx = ode.derivative(ode.x, ode.u, ode.t);
     const x_next = ode.x + dt_vec * dx;
@@ -69,7 +87,12 @@ pub fn Euler(comptime StateDimension: usize, comptime InputDimension: usize, ode
     };
 }
 
-pub fn Huen(comptime StateDimension: usize, comptime InputDimension: usize, ode: ODE(StateDimension, InputDimension), dt: f64) !ODE(StateDimension, InputDimension) {
+pub fn Huen(
+    comptime StateDimension: usize,
+    comptime InputDimension: usize,
+    ode: ODE(StateDimension, InputDimension),
+    dt: f64,
+) !ODE(StateDimension, InputDimension) {
     const Vec = @Vector(StateDimension, f64);
     const dt_vec: Vec = @splat(dt);
     const half_dt_vec: Vec = @splat(dt / 2.0);
@@ -88,32 +111,65 @@ pub fn Huen(comptime StateDimension: usize, comptime InputDimension: usize, ode:
     };
 }
 
-pub fn RungeKutta4(comptime StateDimension: usize, comptime InputDimension: usize, ode: ODE(StateDimension, InputDimension), dt: f64) !ODE(StateDimension, InputDimension) {
+pub fn RungeKutta4(
+    comptime StateDimension: usize,
+    comptime InputDimension: usize,
+    ode: ODE(StateDimension, InputDimension),
+    dt: f64,
+    adaptive: ?bool,
+    tolerance: ?f64,
+) !ODE(StateDimension, InputDimension) {
     const Vec = @Vector(StateDimension, f64);
-    const dt_vec: Vec = @splat(dt);
-    const dt_half: f64 = dt / 2.0;
-    const dt_sixth: Vec = @splat(dt / 6.0);
+    var current_dt = dt;
+    var current_ode = ode;
+    const tol = tolerance orelse 1e-6;
 
-    const half: @Vector(StateDimension, f64) = @splat(0.5);
-    const double: @Vector(StateDimension, f64) = @splat(2.0);
+    while (true) {
+        const dt_vec: Vec = @splat(current_dt);
+        const dt_half: f64 = current_dt / 2.0;
+        const dt_sixth: Vec = @splat(current_dt / 6.0);
 
-    const k1 = ode.derivative(ode.x, ode.u, ode.t);
+        const half: @Vector(StateDimension, f64) = @splat(0.5);
+        const double: @Vector(StateDimension, f64) = @splat(2.0);
 
-    const x2 = ode.x + dt_vec * half * k1;
-    const k2 = ode.derivative(x2, ode.u, ode.t + dt_half);
+        const k1 = current_ode.derivative(current_ode.x, current_ode.u, current_ode.t);
 
-    const x3 = ode.x + dt_vec * half * k2;
-    const k3 = ode.derivative(x3, ode.u, ode.t + dt_half);
+        const x2 = current_ode.x + dt_vec * half * k1;
+        const k2 = current_ode.derivative(x2, current_ode.u, current_ode.t + dt_half);
 
-    const x4 = ode.x + dt_vec * k3;
-    const k4 = ode.derivative(x4, ode.u, ode.t + dt);
+        const x3 = current_ode.x + dt_vec * half * k2;
+        const k3 = current_ode.derivative(x3, current_ode.u, current_ode.t + dt_half);
 
-    const x_next = ode.x + dt_sixth * (k1 + double * k2 + double * k3 + k4);
+        const x4 = current_ode.x + dt_vec * k3;
+        const k4 = current_ode.derivative(x4, current_ode.u, current_ode.t + current_dt);
 
-    return .{
-        .x = x_next,
-        .u = ode.u,
-        .t = ode.t + dt,
-        .derivative = ode.derivative,
-    };
+        const x_next = current_ode.x + dt_sixth * (k1 + double * k2 + double * k3 + k4);
+        if (adaptive orelse false) {
+            // perform calculation again with half step size
+            const half_dt = current_dt / 2.0;
+            const half_step1 = try RungeKutta4(StateDimension, InputDimension, current_ode, half_dt, false, null);
+            const half_step2 = try RungeKutta4(StateDimension, InputDimension, half_step1, half_dt, false, null);
+
+            // estimate the error
+            const error_vec = @abs(x_next - half_step2.x);
+            const max_error = @reduce(.Max, error_vec);
+
+            if (max_error > tol) {
+                // if error is too large decrease the step size
+                current_dt = current_dt / 2.0;
+                continue;
+            } else if (max_error < tol / 10.0) {
+                // if error is very small increase the step size
+                current_dt = current_dt * 2.0;
+                continue;
+            }
+        }
+
+        return .{
+            .x = x_next,
+            .u = current_ode.u,
+            .t = current_ode.t + current_dt,
+            .derivative = current_ode.derivative,
+        };
+    }
 }

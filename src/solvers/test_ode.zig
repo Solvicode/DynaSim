@@ -38,7 +38,7 @@ test "static field preserves state" {
 
     inline for (solvers) |solver| {
         // take a step
-        const next_ode = try initial_ode.step(null, dt, solver);
+        const next_ode = try initial_ode.step(null, dt, solver, null, null);
 
         // check that original state is unchanged
         try std.testing.expectEqual(initial_ode.x, initial_x);
@@ -47,7 +47,7 @@ test "static field preserves state" {
         try std.testing.expectEqual(next_ode.x, initial_x);
 
         // test multiple steps to ensure consistency
-        const next_next_ode = try next_ode.step(null, dt, solver);
+        const next_next_ode = try next_ode.step(null, dt, solver, null, null);
         try std.testing.expectEqual(next_next_ode.x, initial_x);
     }
 }
@@ -59,7 +59,7 @@ test "zero time delta gives error" {
 
     var initial_ode = ode.ODE(2, 0).init(xinit, null, t0, staticField);
     inline for (solvers) |solver| {
-        const result = initial_ode.step(null, dt, solver);
+        const result = initial_ode.step(null, dt, solver, null, null);
         try std.testing.expectError(ode.SolverError.InvalidTimeDelta, result);
     }
 }
@@ -77,7 +77,7 @@ test "final value is as expected" {
 
         var i: usize = 0;
         while (i < 10000) : (i += 1) {
-            current_ode = try current_ode.step(ustep, dt, solver);
+            current_ode = try current_ode.step(ustep, dt, solver, null, null);
             t += dt;
         }
         try std.testing.expectApproxEqAbs(1.0, current_ode.x[0], 1e-3);
