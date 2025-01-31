@@ -5,6 +5,7 @@ pub const SolverError = error{
 pub const IntegrationMethod = enum {
     euler,
     huen,
+    rk4,
 };
 
 pub fn ODE(comptime StateDimension: usize, comptime InputDimension: usize) type {
@@ -49,6 +50,7 @@ pub fn ODE(comptime StateDimension: usize, comptime InputDimension: usize) type 
             switch (method) {
                 .euler => return Euler(StateDimension, InputDimension, new_state, dt),
                 .huen => return Huen(StateDimension, InputDimension, new_state, dt),
+                .rk4 => return RungeKutta4(StateDimension, InputDimension, new_state, dt),
             }
         }
     };
@@ -77,6 +79,36 @@ pub fn Huen(comptime StateDimension: usize, comptime InputDimension: usize, ode:
     const t_intermediate = ode.t + dt;
     const k2 = ode.derivative(x_intermediate, ode.u, t_intermediate);
     const x_next = ode.x + half_dt_vec * (k1 + k2);
+
+    return .{
+        .x = x_next,
+        .u = ode.u,
+        .t = ode.t + dt,
+        .derivative = ode.derivative,
+    };
+}
+
+pub fn RungeKutta4(comptime StateDimension: usize, comptime InputDimension: usize, ode: ODE(StateDimension, InputDimension), dt: f64) !ODE(StateDimension, InputDimension) {
+    const Vec = @Vector(StateDimension, f64);
+    const dt_vec: Vec = @splat(dt);
+    const dt_half: f64 = dt / 2.0;
+    const dt_sixth: Vec = @splat(dt / 6.0);
+
+    const half: @Vector(StateDimension, f64) = @splat(0.5);
+    const double: @Vector(StateDimension, f64) = @splat(2.0);
+
+    const k1 = ode.derivative(ode.x, ode.u, ode.t);
+
+    const x2 = ode.x + dt_vec * half * k1;
+    const k2 = ode.derivative(x2, ode.u, ode.t + dt_half);
+
+    const x3 = ode.x + dt_vec * half * k2;
+    const k3 = ode.derivative(x3, ode.u, ode.t + dt_half);
+
+    const x4 = ode.x + dt_vec * k3;
+    const k4 = ode.derivative(x4, ode.u, ode.t + dt);
+
+    const x_next = ode.x + dt_sixth * (k1 + double * k2 + double * k3 + k4);
 
     return .{
         .x = x_next,

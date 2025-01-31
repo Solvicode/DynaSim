@@ -2,7 +2,11 @@
 const std = @import("std");
 const ode = @import("ode.zig");
 
-const solvers: [2]ode.IntegrationMethod = .{ .euler, .huen };
+const solvers: [3]ode.IntegrationMethod = .{
+    .euler,
+    .huen,
+    .rk4,
+};
 
 // static vector field that always returns [0.0, 0.0]
 fn staticField(x: @Vector(2, f64), u: ?@Vector(0.0, f64), t: ?f64) @Vector(2, f64) {
@@ -61,15 +65,13 @@ test "zero time delta gives error" {
 }
 
 test "final value is as expected" {
+    // initial conditions
+    const xinit = @Vector(2, f64){ 0.0, 0.0 };
+    const ustep = @Vector(2, f64){ 0.0, 1.0 };
+    const t0 = 0.0;
+    const dt = 0.001;
+    const initial_ode = ode.ODE(2, 2).init(xinit, ustep, t0, secondOrderSystem);
     inline for (solvers) |solver| {
-
-        // initial conditions
-        const xinit = @Vector(2, f64){ 0.0, 0.0 };
-        const ustep = @Vector(2, f64){ 0.0, 1.0 };
-        const t0 = 0.0;
-        const dt = 0.001;
-
-        const initial_ode = ode.ODE(2, 2).init(xinit, ustep, t0, secondOrderSystem);
         var current_ode = initial_ode;
         var t: f64 = t0;
 
