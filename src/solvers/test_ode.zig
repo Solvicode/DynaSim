@@ -12,12 +12,14 @@ fn staticField(x: @Vector(2, f64), u: ?@Vector(0.0, f64), t: ?f64) @Vector(2, f6
     return .{ 0.0, 0.0 };
 }
 
-fn firstOrderSystem(x: @Vector(1, f64), u: ?@Vector(1, f64), t: ?f64) @Vector(1, f64) {
-    _ = t;
-    return .{-x + u};
+fn secondOrderSystem(x: @Vector(2, f64), u: ?@Vector(2, f64), t: ?f64) @Vector(2, f64) {
+    _ = t; // no time dependence
+    const input = u orelse @Vector(2, f64){ 0, 0 };
+    return .{
+        x[1],
+        -x[0] - 2 * x[1] + input[1],
+    };
 }
-
-// fn simpleHarmonicOscillator(x: @Vector, u: t: f64) [2]f64
 
 test "static field preserves state" {
 
@@ -58,6 +60,21 @@ test "zero time delta gives error" {
     }
 }
 
-// test "final value is as expected" {
-//     const x0
-// }
+test "final value is as expected" {
+    const xinit = @Vector(2, f64){ 0.0, 0.0 };
+    const ustep = @Vector(2, f64){ 0.0, 1.0 };
+
+    const t0 = 0.0;
+    const dt = 0.00001;
+
+    const initial_ode = ode.ODE(2, 2).init(xinit, ustep, t0, secondOrderSystem);
+    var current_ode = initial_ode;
+
+    inline for (solvers) |solver| {
+        std.debug.print("Testing solver: {any}\n", .{solver});
+        inline for (0..200) |_| {
+            current_ode = try current_ode.step(ustep, dt, solver);
+            std.debug.print("x: {any}\n", .{current_ode.x});
+        }
+    }
+}
