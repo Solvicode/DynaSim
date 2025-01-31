@@ -71,12 +71,27 @@ test "final value is as expected" {
     const dtinit = 0.001;
     const t0 = 0.0;
     const initial_ode = ode.ODE(2, 2).init(xinit, ustep, dtinit, t0, secondOrderSystem);
+
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    const allocator = gpa.allocator();
+    defer _ = gpa.deinit();
+
     inline for (solvers) |solver| {
         var current_ode = initial_ode;
 
+        const filename = try std.fmt.allocPrint(allocator, "results_{s}.csv", .{@tagName(solver)});
+        defer allocator.free(filename);
+
+        const file = try std.fs.cwd().createFile(filename, .{});
+        defer file.close();
+
+        const writer = file.writer();
+        try writer.writeAll("time,x0,x1\n");
+
         var i: usize = 0;
         while (i < 10000) : (i += 1) {
-            current_ode = try current_ode.step(ustep, solver, null, null, null);
+            try writer.print("{d},{d},{d}\n", .{ current_ode.t, current_ode.x[0], current_ode.x[1] });
+            current_ode = try current_ode.step(ustep, solver, true, null, null);
         }
         try std.testing.expectApproxEqAbs(1.0, current_ode.x[0], 1e-3);
         try std.testing.expectApproxEqAbs(0.0, current_ode.x[1], 1e-3);
