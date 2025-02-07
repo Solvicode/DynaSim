@@ -1,7 +1,7 @@
 const std = @import("std");
 const core_sim = @import("core_sim.zig");
-const ODE = @import("../simulation/ode.zig").ODE;
-const IntegrationMethod = @import("../simulation/ode.zig").IntegrationMethod;
+const ODE = @import("../solvers/ode.zig.").ODE;
+const IntegrationMethod = @import("../solvers/ode.zig.").IntegrationMethod;
 
 const StateDimension = 2;
 const InputDimension = 1;

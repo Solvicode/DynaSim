@@ -1,7 +1,7 @@
 const std = @import("std");
-const ODE = @import("../simulation/ode.zig").ODE;
-const IntegrationMethod = @import("../simulation/ode.zig").IntegrationMethod;
-const SolverError = @import("../simulation/ode.zig").SolverError;
+const ODE = @import("../solvers/ode.zig.").ODE;
+const IntegrationMethod = @import("../solvers/ode.zig.").IntegrationMethod;
+const SolverError = @import("../solvers/ode.zig.").SolverError;
 
 pub fn simulate(StateDimension: usize, InputDimension: usize, initial_dt: f64, end_time: f64, derivative: fn (@Vector(StateDimension, f64)) @Vector(StateDimension, f64), method: IntegrationMethod) !void {
     // Create initial state (assuming 0s for now)
